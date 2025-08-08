@@ -1,20 +1,89 @@
+import { db } from '../db';
+import { tallyItemsTable, tallyVotesTable } from '../db/schema';
 import { type VoteInput, type TallyItem } from '../schema';
+import { eq, and, sql } from 'drizzle-orm';
 
 export async function voteOnItem(input: VoteInput): Promise<TallyItem> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to process a user's vote (increment/decrement) on a tally item.
-    // Logic should:
-    // 1. Find or create a tally_vote record for this user_session_id + item_id combination
-    // 2. For increment (delta: +1): Always allow, increase user's count and item's total_count
-    // 3. For decrement (delta: -1): Only allow if user has positive count, decrease both counts
-    // 4. Update the item's total_count to reflect the sum of all user votes
-    // 5. Return the updated item with new total_count
+  try {
+    // First verify the item exists
+    const item = await db.select()
+      .from(tallyItemsTable)
+      .where(eq(tallyItemsTable.id, input.item_id))
+      .execute();
     
-    return Promise.resolve({
-        id: input.item_id,
-        list_id: 'placeholder-list-id',
-        name: 'Placeholder Item',
-        total_count: 1, // Placeholder count after vote
-        created_at: new Date()
-    } as TallyItem);
+    if (item.length === 0) {
+      throw new Error(`Item with id ${input.item_id} not found`);
+    }
+
+    // Find existing vote record for this user + item combination
+    const existingVote = await db.select()
+      .from(tallyVotesTable)
+      .where(and(
+        eq(tallyVotesTable.item_id, input.item_id),
+        eq(tallyVotesTable.user_session_id, input.user_session_id)
+      ))
+      .execute();
+
+    let userVoteCount = 0;
+    
+    if (existingVote.length > 0) {
+      userVoteCount = existingVote[0].count;
+    }
+
+    // For decrement, check if user has positive count
+    if (input.delta === -1 && userVoteCount <= 0) {
+      throw new Error('Cannot decrement: user has no votes on this item');
+    }
+
+    const newUserCount = userVoteCount + input.delta;
+
+    // Update or insert the vote record
+    if (existingVote.length > 0) {
+      // Update existing vote
+      await db.update(tallyVotesTable)
+        .set({ 
+          count: newUserCount,
+          updated_at: new Date()
+        })
+        .where(eq(tallyVotesTable.id, existingVote[0].id))
+        .execute();
+    } else {
+      // Create new vote record (only if delta is positive)
+      await db.insert(tallyVotesTable)
+        .values({
+          id: crypto.randomUUID(),
+          item_id: input.item_id,
+          user_session_id: input.user_session_id,
+          count: newUserCount
+        })
+        .execute();
+    }
+
+    // Calculate the new total count by summing all user votes for this item
+    const totalCountResult = await db.select({
+      total: sql<number>`COALESCE(SUM(${tallyVotesTable.count}), 0)`
+    })
+      .from(tallyVotesTable)
+      .where(eq(tallyVotesTable.item_id, input.item_id))
+      .execute();
+
+    const newTotalCount = Number(totalCountResult[0].total);
+
+    // Update the item's total_count
+    await db.update(tallyItemsTable)
+      .set({ total_count: newTotalCount })
+      .where(eq(tallyItemsTable.id, input.item_id))
+      .execute();
+
+    // Return the updated item
+    const updatedItem = await db.select()
+      .from(tallyItemsTable)
+      .where(eq(tallyItemsTable.id, input.item_id))
+      .execute();
+
+    return updatedItem[0];
+  } catch (error) {
+    console.error('Vote operation failed:', error);
+    throw error;
+  }
 }

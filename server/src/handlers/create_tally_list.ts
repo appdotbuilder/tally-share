@@ -1,15 +1,27 @@
+import { db } from '../db';
+import { tallyListsTable } from '../db/schema';
 import { type CreateTallyListInput, type TallyList } from '../schema';
 
-export async function createTallyList(input: CreateTallyListInput): Promise<TallyList> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new tally list with a unique shareable URL (ID).
-    // Should generate a unique UUID for the list ID and persist it in the database.
-    
+export const createTallyList = async (input: CreateTallyListInput): Promise<TallyList> => {
+  try {
     const listId = crypto.randomUUID(); // Generate unique ID for shareable URL
     
-    return Promise.resolve({
+    // Insert tally list record
+    const result = await db.insert(tallyListsTable)
+      .values({
         id: listId,
-        title: input.title,
-        created_at: new Date()
-    } as TallyList);
-}
+        title: input.title
+      })
+      .returning()
+      .execute();
+
+    const tallyList = result[0];
+    return {
+      ...tallyList,
+      created_at: new Date(tallyList.created_at)
+    };
+  } catch (error) {
+    console.error('Tally list creation failed:', error);
+    throw error;
+  }
+};

@@ -1,11 +1,32 @@
+import { db } from '../db';
+import { tallyVotesTable, tallyItemsTable } from '../db/schema';
 import { type UserVoteCount } from '../schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function getUserVotes(listId: string, userSessionId: string): Promise<UserVoteCount[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch all vote counts for a specific user session
-    // within a specific tally list. This allows the client to know which items
-    // the user can decrement (where user_count > 0).
-    // Returns array of { item_id, user_count } objects.
-    
-    return Promise.resolve([]);
+  try {
+    // Join tally_votes with tally_items to filter by list_id
+    // This ensures we only get votes for items in the specified list
+    const results = await db.select({
+      item_id: tallyVotesTable.item_id,
+      user_count: tallyVotesTable.count
+    })
+    .from(tallyVotesTable)
+    .innerJoin(tallyItemsTable, eq(tallyVotesTable.item_id, tallyItemsTable.id))
+    .where(
+      and(
+        eq(tallyItemsTable.list_id, listId),
+        eq(tallyVotesTable.user_session_id, userSessionId)
+      )
+    )
+    .execute();
+
+    return results.map(result => ({
+      item_id: result.item_id,
+      user_count: result.user_count
+    }));
+  } catch (error) {
+    console.error('Failed to get user votes:', error);
+    throw error;
+  }
 }
