@@ -3,24 +3,23 @@ import { createHTTPServer } from '@trpc/server/adapters/standalone';
 import 'dotenv/config';
 import cors from 'cors';
 import superjson from 'superjson';
+import { z } from 'zod';
 
 // Import schemas
 import { 
-  createListInputSchema,
-  getListInputSchema,
-  createItemInputSchema,
-  incrementItemInputSchema,
-  decrementItemInputSchema,
-  removeItemInputSchema
+  createTallyListInputSchema, 
+  createTallyItemInputSchema, 
+  voteInputSchema, 
+  removeItemInputSchema 
 } from './schema';
 
 // Import handlers
-import { createList } from './handlers/create_list';
-import { getList } from './handlers/get_list';
-import { createItem } from './handlers/create_item';
-import { incrementItem } from './handlers/increment_item';
-import { decrementItem } from './handlers/decrement_item';
-import { removeItem } from './handlers/remove_item';
+import { createTallyList } from './handlers/create_tally_list';
+import { getTallyList } from './handlers/get_tally_list';
+import { createTallyItem } from './handlers/create_tally_item';
+import { voteOnItem } from './handlers/vote_on_item';
+import { removeTallyItem } from './handlers/remove_tally_item';
+import { getUserVotes } from './handlers/get_user_votes';
 
 const t = initTRPC.create({
   transformer: superjson,
@@ -30,36 +29,42 @@ const publicProcedure = t.procedure;
 const router = t.router;
 
 const appRouter = router({
-  // Health check endpoint
   healthcheck: publicProcedure.query(() => {
     return { status: 'ok', timestamp: new Date().toISOString() };
   }),
 
-  // List operations
-  createList: publicProcedure
-    .input(createListInputSchema)
-    .mutation(({ input }) => createList(input)),
+  // Create a new tally list
+  createTallyList: publicProcedure
+    .input(createTallyListInputSchema)
+    .mutation(({ input }) => createTallyList(input)),
 
-  getList: publicProcedure
-    .input(getListInputSchema)
-    .query(({ input }) => getList(input)),
+  // Get a tally list by ID with all its items
+  getTallyList: publicProcedure
+    .input(z.object({ listId: z.string() }))
+    .query(({ input }) => getTallyList(input.listId)),
 
-  // Item operations
-  createItem: publicProcedure
-    .input(createItemInputSchema)
-    .mutation(({ input }) => createItem(input)),
+  // Add a new item to a tally list
+  createTallyItem: publicProcedure
+    .input(createTallyItemInputSchema)
+    .mutation(({ input }) => createTallyItem(input)),
 
-  incrementItem: publicProcedure
-    .input(incrementItemInputSchema)
-    .mutation(({ input }) => incrementItem(input)),
+  // Vote on an item (increment or decrement)
+  voteOnItem: publicProcedure
+    .input(voteInputSchema)
+    .mutation(({ input }) => voteOnItem(input)),
 
-  decrementItem: publicProcedure
-    .input(decrementItemInputSchema)
-    .mutation(({ input }) => decrementItem(input)),
-
-  removeItem: publicProcedure
+  // Remove an item (only if total count is 0)
+  removeTallyItem: publicProcedure
     .input(removeItemInputSchema)
-    .mutation(({ input }) => removeItem(input)),
+    .mutation(({ input }) => removeTallyItem(input)),
+
+  // Get user's vote counts for all items in a list
+  getUserVotes: publicProcedure
+    .input(z.object({ 
+      listId: z.string(), 
+      userSessionId: z.string() 
+    }))
+    .query(({ input }) => getUserVotes(input.listId, input.userSessionId)),
 });
 
 export type AppRouter = typeof appRouter;

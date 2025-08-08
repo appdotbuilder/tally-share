@@ -1,88 +1,82 @@
 import { z } from 'zod';
 
-// List schema
-export const listSchema = z.object({
-  id: z.string(), // UUID for unique shareable URLs
+// Tally List schema
+export const tallyListSchema = z.object({
+  id: z.string(),
   title: z.string(),
-  created_at: z.coerce.date()
+  created_at: z.coerce.date(),
 });
 
-export type List = z.infer<typeof listSchema>;
+export type TallyList = z.infer<typeof tallyListSchema>;
 
-// Item schema
-export const itemSchema = z.object({
-  id: z.number(),
+// Input schema for creating tally lists
+export const createTallyListInputSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+});
+
+export type CreateTallyListInput = z.infer<typeof createTallyListInputSchema>;
+
+// Tally Item schema
+export const tallyItemSchema = z.object({
+  id: z.string(),
   list_id: z.string(),
   name: z.string(),
   total_count: z.number().int().nonnegative(),
-  created_at: z.coerce.date()
-});
-
-export type Item = z.infer<typeof itemSchema>;
-
-// User contribution schema (tracks individual user contributions to items)
-export const userContributionSchema = z.object({
-  id: z.number(),
-  item_id: z.number(),
-  user_session_id: z.string(), // Anonymous session ID to track user contributions
-  count: z.number().int().nonnegative(),
   created_at: z.coerce.date(),
-  updated_at: z.coerce.date()
 });
 
-export type UserContribution = z.infer<typeof userContributionSchema>;
+export type TallyItem = z.infer<typeof tallyItemSchema>;
 
-// Input schema for creating lists
-export const createListInputSchema = z.object({
-  title: z.string().min(1, "Title is required")
-});
-
-export type CreateListInput = z.infer<typeof createListInputSchema>;
-
-// Input schema for creating items
-export const createItemInputSchema = z.object({
+// Input schema for creating tally items
+export const createTallyItemInputSchema = z.object({
   list_id: z.string(),
-  name: z.string().min(1, "Item name is required")
+  name: z.string().min(1, 'Item name is required'),
 });
 
-export type CreateItemInput = z.infer<typeof createItemInputSchema>;
+export type CreateTallyItemInput = z.infer<typeof createTallyItemInputSchema>;
 
-// Input schema for incrementing item count
-export const incrementItemInputSchema = z.object({
-  item_id: z.number(),
-  user_session_id: z.string()
+// Tally Vote schema - tracks individual user contributions
+export const tallyVoteSchema = z.object({
+  id: z.string(),
+  item_id: z.string(),
+  user_session_id: z.string(),
+  count: z.number().int(),
+  created_at: z.coerce.date(),
+  updated_at: z.coerce.date(),
 });
 
-export type IncrementItemInput = z.infer<typeof incrementItemInputSchema>;
+export type TallyVote = z.infer<typeof tallyVoteSchema>;
 
-// Input schema for decrementing item count
-export const decrementItemInputSchema = z.object({
-  item_id: z.number(),
-  user_session_id: z.string()
+// Input schema for voting (increment/decrement)
+export const voteInputSchema = z.object({
+  item_id: z.string(),
+  user_session_id: z.string(),
+  delta: z.number().int().min(-1).max(1), // Can only increment by 1 or decrement by 1
 });
 
-export type DecrementItemInput = z.infer<typeof decrementItemInputSchema>;
+export type VoteInput = z.infer<typeof voteInputSchema>;
 
 // Input schema for removing items
 export const removeItemInputSchema = z.object({
-  item_id: z.number()
+  item_id: z.string(),
 });
 
 export type RemoveItemInput = z.infer<typeof removeItemInputSchema>;
 
-// Input schema for getting list data
-export const getListInputSchema = z.object({
-  list_id: z.string()
-});
-
-export type GetListInput = z.infer<typeof getListInputSchema>;
-
-// Combined list with items response schema
-export const listWithItemsSchema = z.object({
+// Response schema for tally list with items
+export const tallyListWithItemsSchema = z.object({
   id: z.string(),
   title: z.string(),
   created_at: z.coerce.date(),
-  items: z.array(itemSchema)
+  items: z.array(tallyItemSchema),
 });
 
-export type ListWithItems = z.infer<typeof listWithItemsSchema>;
+export type TallyListWithItems = z.infer<typeof tallyListWithItemsSchema>;
+
+// Response schema for user's vote counts per item
+export const userVoteCountSchema = z.object({
+  item_id: z.string(),
+  user_count: z.number().int(),
+});
+
+export type UserVoteCount = z.infer<typeof userVoteCountSchema>;
